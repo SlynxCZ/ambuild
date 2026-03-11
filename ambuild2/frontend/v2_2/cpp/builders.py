@@ -419,6 +419,9 @@ class BinaryBuilder(BinaryBuilderBase):
         return self.computeLinkerOutputFile(self.name_, self.type)
 
     def generate(self, generator, cx):
+        if getattr(generator.cm.options, 'generate_cmake', False):
+            generator.addCMakeTarget(self)
+
         # Find dependencies
         inputs = []
         generator.parseCxxDeps(cx, self, inputs, self.compiler.linkflags)
@@ -789,3 +792,4 @@ class PrecompiledHeaders(BinaryBuilderBase):
             obj_entry = nodes[0]
 
         return PchNodes(local_folder_node, unified_header, pch_entry, obj_entry, self.source_type)
+
