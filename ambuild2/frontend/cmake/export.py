@@ -313,10 +313,10 @@ class Exporter(object):
                 proto_name = proto_name[:-len('.proto')]
 
             protoc_command = [_normalize_path(os.path.normpath(protoc.path))]
+            protoc_command.append('--proto_path={}'.format(_normalize_path(os.path.dirname(source))))
             protoc_command.extend(str(arg) for arg in getattr(protoc, 'extra_argv', []))
             protoc_command.extend(['-I={}'.format(path) for path in include_paths])
             protoc_command.append('--cpp_out={}'.format(output_path))
-            protoc_command.append('--proto_path={}'.format(_normalize_path(os.path.dirname(source))))
             protoc_command.append(source)
 
             commands.append({
