@@ -222,9 +222,8 @@ class Exporter(object):
         root_context = builder.modules_[0].context if builder.modules_ else None
         for module in builder.modules_:
             for custom in getattr(module, 'custom', []):
-                protoc = self._build_protoc_command(builder, root_context, module, custom)
-                if protoc is not None:
-                    commands.append(protoc)
+                protoc_commands = self._build_protoc_commands(builder, root_context, module, custom)
+                commands.extend(protoc_commands)
         return commands
 
     def _collect_post_build_commands(self, target):
@@ -280,11 +279,11 @@ class Exporter(object):
             include_dirs.append(_normalize_path(os.path.normpath(output_path)))
         return include_dirs
 
-    def _build_protoc_command(self, builder, root_context, module, custom):
+    def _build_protoc_commands(self, builder, root_context, module, custom):
         protoc = getattr(custom, 'protoc', None)
         sources = getattr(custom, 'sources', None)
         if protoc is None or sources is None:
-            return None
+            return []
 
         _, output_path = builder.computeModuleFolders(root_context, module.context)
         output_path = _normalize_path(os.path.normpath(output_path))
@@ -293,38 +292,39 @@ class Exporter(object):
             if not os.path.isabs(include):
                 include = os.path.join(module.context.currentSourcePath, include)
             include_paths.append(_normalize_path(os.path.normpath(include)))
+        include_paths = self._dedupe(include_paths)
 
-        proto_files = []
-        generated = []
-        protoc_command = [_normalize_path(os.path.normpath(protoc.path))]
-        protoc_command.extend(str(arg) for arg in getattr(protoc, 'extra_argv', []))
-        protoc_command.extend(['-I={}'.format(path) for path in include_paths])
-        protoc_command.append('--cpp_out={}'.format(output_path))
-
+        commands = []
         for source in sources:
             if not os.path.isabs(source):
                 source = os.path.join(module.context.currentSourcePath, source)
             source = _normalize_path(os.path.normpath(source))
-            proto_files.append(source)
-            proto_dir = _normalize_path(os.path.dirname(source))
-            protoc_command.append('--proto_path={}'.format(proto_dir))
-            protoc_command.append(source)
 
             proto_name = os.path.basename(source)
             if proto_name.endswith('.proto'):
                 proto_name = proto_name[:-len('.proto')]
-            generated.append('{}/{}.pb.cc'.format(output_path, proto_name))
-            generated.append('{}/{}.pb.h'.format(output_path, proto_name))
 
-        return {
-            'kind': 'protoc',
-            'outputs': generated,
-            'depends': proto_files,
-            'commands': [
-                ['${CMAKE_COMMAND}', '-E', 'make_directory', output_path],
-                protoc_command,
-            ],
-        }
+            protoc_command = [_normalize_path(os.path.normpath(protoc.path))]
+            protoc_command.extend(str(arg) for arg in getattr(protoc, 'extra_argv', []))
+            protoc_command.extend(['-I={}'.format(path) for path in include_paths])
+            protoc_command.append('--cpp_out={}'.format(output_path))
+            protoc_command.append('--proto_path={}'.format(_normalize_path(os.path.dirname(source))))
+            protoc_command.append(source)
+
+            commands.append({
+                'kind': 'protoc',
+                'outputs': [
+                    '{}/{}.pb.cc'.format(output_path, proto_name),
+                    '{}/{}.pb.h'.format(output_path, proto_name),
+                ],
+                'depends': [source],
+                'commands': [
+                    ['${CMAKE_COMMAND}', '-E', 'make_directory', output_path],
+                    protoc_command,
+                ],
+            })
+
+        return commands
 
     def _resolve_source(self, context, entry):
         if isinstance(entry, str):
