@@ -38,6 +38,7 @@ class Exporter(object):
         output_path = self._target_output_path(builder)
         self.output_targets_[os.path.normpath(output_path)] = target_name
         link_dirs, link_options, link_libraries = self._collect_link_settings(builder.compiler)
+        custom_commands = self._collect_custom_commands(builder)
         target = {
             'builder': builder,
             'name': target_name,
@@ -45,7 +46,7 @@ class Exporter(object):
             'output_path': output_path,
             'type': builder.type,
             'sources': self._collect_sources(builder),
-            'custom_commands': self._collect_custom_commands(builder),
+            'custom_commands': custom_commands,
             'include_dirs': self._collect_include_dirs(builder.compiler)
                             + self._collect_custom_include_dirs(builder),
             'compile_defines': self._collect_compile_defines(builder.compiler),
@@ -55,6 +56,7 @@ class Exporter(object):
             'link_libraries': link_libraries,
             'pch_headers': self._collect_pch_headers(builder.compiler),
         }
+        target['sources'] = self._dedupe(target['sources'] + self._collect_custom_outputs(custom_commands))
         target['include_dirs'] = self._dedupe(target['include_dirs'])
         self.targets_.append(target)
 
@@ -225,6 +227,12 @@ class Exporter(object):
                 protoc_commands = self._build_protoc_commands(builder, root_context, module, custom)
                 commands.extend(protoc_commands)
         return commands
+
+    def _collect_custom_outputs(self, commands):
+        outputs = []
+        for command in commands:
+            outputs.extend(command.get('outputs', []))
+        return outputs
 
     def _collect_post_build_commands(self, target):
         commands = []
