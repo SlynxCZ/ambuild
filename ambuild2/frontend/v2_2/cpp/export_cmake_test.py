@@ -3,7 +3,7 @@ import unittest
 
 from ambuild2.frontend.system import System
 from ambuild2.frontend.v2_2.cpp import builders
-from ambuild2.frontend.v2_2.cpp import export_cmake
+from ambuild2.frontend.cmake import export as export_cmake
 from ambuild2.frontend.v2_2.cpp.compiler import CliCompiler
 from ambuild2.frontend.v2_2.cpp.gcc import GCC
 
@@ -63,6 +63,7 @@ class ExportCMakeTest(unittest.TestCase):
         exporter.add_target(builder)
         rendered = exporter.render()
 
+        self.assertIn('project(project LANGUAGES C CXX)', rendered)
         self.assertIn('add_executable(sample', rendered)
         self.assertIn('"C:/src/project/src/main.cpp"', rendered)
         self.assertIn('"C:/src/project/objdir/generated/file.cpp"', rendered)
@@ -106,10 +107,10 @@ class ExportCMakeTest(unittest.TestCase):
         rendered = exporter.render()
 
         self.assertIn('add_custom_command(TARGET client_cvar_value POST_BUILD', rendered)
+        self.assertIn('set_target_properties(client_cvar_value PROPERTIES PREFIX "")', rendered)
         self.assertIn('"$<TARGET_FILE:client_cvar_value>"', rendered)
         self.assertIn('"/build/project/package/addons/client_cvar_value/client_cvar_value.dll"', rendered)
-        self.assertIn('"/build/project/client_cvar_value.vdf"', rendered)
-        self.assertIn('"/build/project/package/addons/metamod/client_cvar_value.vdf"', rendered)
+        self.assertIn('configure_file("/build/project/client_cvar_value.vdf" "/build/project/package/addons/metamod/client_cvar_value.vdf" COPYONLY)', rendered)
         self.assertNotIn('"/home/hl2sdk-cs2/lib/linux64/libtier0.so"', rendered)
 
     def test_synthetic_link_input_uses_original_library_path(self):
@@ -150,6 +151,7 @@ class ExportCMakeTest(unittest.TestCase):
         exporter.add_target(builder_b)
         rendered = exporter.render()
 
+        self.assertIn('project(project LANGUAGES C CXX)', rendered)
         self.assertIn('add_executable(sample', rendered)
         self.assertIn('add_executable(sample_linux_x86_64', rendered)
         self.assertIn('set_target_properties(sample_linux_x86_64 PROPERTIES OUTPUT_NAME "sample")',
@@ -186,3 +188,6 @@ class ExportCMakeTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+

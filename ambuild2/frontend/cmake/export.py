@@ -65,9 +65,13 @@ class Exporter(object):
     def render(self):
         lines = [
             'cmake_minimum_required(VERSION 3.16)',
-            'project(ambuild_generated LANGUAGES C CXX)',
+            'project({} LANGUAGES C CXX)'.format(self._project_name()),
             '',
         ]
+
+        lines.extend(self._render_configure_time_copies())
+        if lines[-1] != '':
+            lines.append('')
 
         for target in self.targets_:
             lines.extend(self._render_target(target))
@@ -75,6 +79,67 @@ class Exporter(object):
 
         return '\n'.join(lines).rstrip() + '\n'
 
+    def _project_name(self):
+        base = os.path.basename(os.path.normpath(self.cm.sourcePath))
+        if not base:
+            base = os.path.basename(os.path.normpath(self.cm.buildPath))
+        if not base:
+            return 'ambuild_generated'
+
+        sanitized = []
+        for ch in base:
+            if ch.isalnum() or ch == '_':
+                sanitized.append(ch)
+            else:
+                sanitized.append('_')
+        result = ''.join(sanitized).strip('_')
+        return result or 'ambuild_generated'
+
+    def _collect_configure_time_copies(self):
+        copies = []
+        target_outputs = set(os.path.normpath(target['output_path']) for target in self.targets_)
+        file_ops = getattr(self.cm.generator, 'cmake_file_ops', {})
+        for file_op in file_ops.values():
+            if file_op['kind'] != 'copy':
+                continue
+
+            source_path = os.path.normpath(file_op['source'])
+            output_path = os.path.normpath(file_op['output'])
+            if source_path in target_outputs:
+                continue
+            if not self._looks_like_package_output(output_path):
+                continue
+
+
+            copies.append({
+                'source': _normalize_path(source_path),
+                'output': _normalize_path(output_path),
+                'dir': _normalize_path(os.path.dirname(output_path)),
+            })
+        return self._dedupe_copy_items(copies)
+
+    def _dedupe_copy_items(self, copies):
+        unique = []
+        seen = set()
+        for item in copies:
+            key = (item['source'], item['output'])
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(item)
+        return unique
+
+    def _render_configure_time_copies(self):
+        copies = self._collect_configure_time_copies()
+        if not copies:
+            return []
+
+        lines = []
+        for item in copies:
+            lines.append('file(MAKE_DIRECTORY {})'.format(_cmake_quote(item['dir'])))
+            lines.append('configure_file({} {} COPYONLY)'.format(
+                _cmake_quote(item['source']), _cmake_quote(item['output'])))
+        return lines
     def _allocate_target_name(self, builder):
         base = builder.name_
         if base not in self.target_names_:
@@ -149,25 +214,6 @@ class Exporter(object):
 
         if not has_binary_package_copy:
             return commands
-
-        for file_op in file_ops.values():
-            if file_op['kind'] != 'copy':
-                continue
-
-            source_path = _normalize_path(os.path.normpath(file_op['source']))
-            output_path = _normalize_path(os.path.normpath(file_op['output']))
-            if os.path.normpath(source_path) == os.path.normpath(target['output_path']):
-                continue
-            if not self._looks_like_package_output(output_path):
-                continue
-
-            dest_dir = _normalize_path(os.path.dirname(output_path))
-            commands.append([
-                '${CMAKE_COMMAND}', '-E', 'make_directory', dest_dir,
-            ])
-            commands.append([
-                '${CMAKE_COMMAND}', '-E', 'copy_if_different', source_path, output_path,
-            ])
 
         return self._dedupe_commands(commands)
 
@@ -383,9 +429,14 @@ class Exporter(object):
             lines.append('  {}'.format(_cmake_quote(source)))
         lines.append(')')
 
+        properties = []
         if target['name'] != target['output_name']:
-            lines.append('set_target_properties({} PROPERTIES OUTPUT_NAME {})'.format(
-                target['name'], _cmake_quote(target['output_name'])))
+            properties.extend(['OUTPUT_NAME', _cmake_quote(target['output_name'])])
+        if target['type'] == 'library':
+            properties.extend(['PREFIX', _cmake_quote('')])
+        if properties:
+            lines.append('set_target_properties({} PROPERTIES {})'.format(
+                target['name'], ' '.join(properties)))
 
         lines.extend(self._render_list_call('target_include_directories', target['name'], 'PRIVATE',
                                             target['include_dirs']))
@@ -442,3 +493,6 @@ class Exporter(object):
             lines.append('  {}'.format(_cmake_quote(value)))
         lines.append(')')
         return lines
+
+
+
