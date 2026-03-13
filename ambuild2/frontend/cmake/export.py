@@ -31,14 +31,18 @@ class Exporter(object):
         self.cm = cm
         self.targets_ = []
         self.target_names_ = set()
+        self.output_targets_ = {}
 
     def add_target(self, builder):
+        target_name = self._allocate_target_name(builder)
+        output_path = self._target_output_path(builder)
+        self.output_targets_[os.path.normpath(output_path)] = target_name
         link_dirs, link_options, link_libraries = self._collect_link_settings(builder.compiler)
         target = {
             'builder': builder,
-            'name': self._allocate_target_name(builder),
+            'name': target_name,
             'output_name': builder.name_,
-            'output_path': self._target_output_path(builder),
+            'output_path': output_path,
             'type': builder.type,
             'sources': self._collect_sources(builder),
             'custom_commands': self._collect_custom_commands(builder),
@@ -364,12 +368,15 @@ class Exporter(object):
             rendered = self._stringify_value(value)
             rendered = synthetic_inputs.get(rendered, rendered)
 
+            target_name = self.output_targets_.get(os.path.normpath(rendered))
             if rendered.startswith('-L') and len(rendered) > 2:
                 link_dirs.append(rendered[2:])
             elif rendered.startswith('/LIBPATH:') and len(rendered) > 9:
                 link_dirs.append(rendered[9:])
             elif rendered.startswith('-l') and len(rendered) > 2:
                 link_libraries.append(rendered[2:])
+            elif target_name is not None:
+                link_libraries.append(target_name)
             elif self._is_library_path(rendered):
                 link_libraries.append(rendered)
             elif self._is_link_flag(rendered):
@@ -527,6 +534,9 @@ class Exporter(object):
             lines.append('  {}'.format(_cmake_quote(value)))
         lines.append(')')
         return lines
+
+
+
 
 
 
