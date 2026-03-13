@@ -69,6 +69,7 @@ class Exporter(object):
             '',
         ]
 
+        lines.extend(self._render_generated_files())
         lines.extend(self._render_configure_time_copies())
         if lines[-1] != '':
             lines.append('')
@@ -94,6 +95,39 @@ class Exporter(object):
                 sanitized.append('_')
         result = ''.join(sanitized).strip('_')
         return result or 'ambuild_generated'
+
+    def _collect_generated_files(self):
+        files = []
+        generated = getattr(self.cm.generator, 'cmake_generated_files', {})
+        for path, contents in generated.items():
+            files.append({
+                'path': _normalize_path(os.path.normpath(path)),
+                'dir': _normalize_path(os.path.dirname(os.path.normpath(path))),
+                'contents': contents,
+            })
+        files.sort(key = lambda item: item['path'])
+        return files
+
+    def _cmake_bracket_quote(self, value):
+        text = str(value)
+        for count in range(8):
+            marker = '=' * count
+            closing = ']{}]'.format(marker)
+            if closing not in text:
+                return '[{}[{}]{}]'.format(marker, text, marker)
+        return _cmake_quote(text)
+
+    def _render_generated_files(self):
+        files = self._collect_generated_files()
+        if not files:
+            return []
+
+        lines = []
+        for item in files:
+            lines.append('file(MAKE_DIRECTORY {})'.format(_cmake_quote(item['dir'])))
+            lines.append('file(WRITE {} {})'.format(
+                _cmake_quote(item['path']), self._cmake_bracket_quote(item['contents'])))
+        return lines
 
     def _collect_configure_time_copies(self):
         copies = []
@@ -493,6 +527,11 @@ class Exporter(object):
             lines.append('  {}'.format(_cmake_quote(value)))
         lines.append(')')
         return lines
+
+
+
+
+
 
 
 

@@ -39,6 +39,7 @@ class Generator(BaseGenerator):
         self.compdb = []
         self.cmake = None
         self.cmake_file_ops = {}
+        self.cmake_generated_files = {}
 
         if getattr(self.cm.options, 'generate_cmake', False):
             self.cmake = cmake_export.Exporter(cm)
@@ -785,7 +786,25 @@ class Generator(BaseGenerator):
                                      data = data,
                                      inputs = [],
                                      outputs = [filename])
+        self._record_generated_file(outputs[0], contents)
         return outputs[0]
+
+    def _record_generated_file(self, output_entry, contents):
+        if self.cmake is None or not hasattr(output_entry, 'path'):
+            return
+
+        path = output_entry.path
+        if not os.path.isabs(path):
+            path = os.path.join(self.cm.buildPath, path)
+        path = os.path.normpath(path)
+
+        if isinstance(contents, bytes):
+            try:
+                contents = contents.decode('utf-8')
+            except UnicodeDecodeError:
+                return
+
+        self.cmake_generated_files[path] = contents
 
     def addConfigureFile(self, context, path):
         if not os.path.isabs(path) and context is not None:
@@ -837,6 +856,9 @@ class Generator(BaseGenerator):
                                          data = rcData,
                                          env_data = obj.env_data)
         return rcNode
+
+
+
 
 
 
