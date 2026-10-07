@@ -10,3 +10,9 @@ cxx = builder.DetectCxx()
 
 Libs = builder.Build('libs/AMBuilder', {'cxx': cxx})
 builder.Build('program/AMBuilder', {'cxx': cxx, 'Libs': Libs})
+
+# hl2sdk-manifests runs an SDK library's script once per architecture, so the
+# same projects are made again in the same folder: with --gen=vs, one project
+# file with the configurations of both.
+if builder.host.platform == 'windows':
+  builder.Build('libs/AMBuilder', {'cxx': builder.DetectCxx(target_arch = 'x86_64')})
