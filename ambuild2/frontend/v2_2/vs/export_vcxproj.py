@@ -148,8 +148,12 @@ def export_configuration_user_props(node, xml):
 def export_configuration_paths(node, xml):
     for builder in node.project.builders_:
         condition = condition_for(builder)
-        xml.tag('OutDir', "$(ProjectName) - $(Configuration)\\", Condition = condition)
-        xml.tag('IntDir', "$(ProjectName) - $(Configuration)\\", Condition = condition)
+        # The folder the generator put the output node in, which is what other
+        # projects link against; for builders of a multi-binary project it isn't
+        # "$(ProjectName) - $(Configuration)".
+        out_dir = builder.localFolder + '\\'
+        xml.tag('OutDir', out_dir, Condition = condition)
+        xml.tag('IntDir', out_dir, Condition = condition)
         if '/INCREMENTAL:NO' not in builder.compiler.linkflags and '/INCREMENTAL:NO' not in builder.compiler.postlink:
             xml.tag('LinkIncremental', 'true', Condition = condition)
         xml.tag('TargetName', builder.name_, Condition = condition)

@@ -85,6 +85,8 @@ class Project(object):
             objFile = paths.Join(tag_folder, builder.outputFile)
             pdbFile = paths.Join(tag_folder, builder.name_ + '.pdb')
             objNode = generator.addOutput(cx, objFile, node)
+            # The solution maps a binary a project links back to the builder making it.
+            objNode.builder = builder
             pdbNode = generator.addOutput(cx, pdbFile, node)
             outputs.append(CppNodes(objNode, pdbNode, builder.type, builder.compiler.target))
         generator.addProjectNode(cx, node)
