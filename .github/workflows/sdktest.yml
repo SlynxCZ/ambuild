@@ -1,0 +1,62 @@
+name: SDK solution test
+
+on: [push, workflow_dispatch]
+
+jobs:
+  metamod:
+    runs-on: windows-2025
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [cs2, tf2]
+    steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    - uses: microsoft/setup-msbuild@v2
+    - uses: actions/checkout@v4
+      with:
+        path: ambuild
+    - name: Install AMBuild
+      run: python -m pip install ./ambuild
+    - name: Get Metamod:Source and the SDK
+      run: |
+        git clone -q --recursive https://github.com/alliedmodders/metamod-source.git
+        if ('${{ matrix.sdk }}' -eq 'cs2') {
+          git clone -q --recursive --depth 1 --branch cs2 https://github.com/alliedmodders/s2sdk.git sdks/hl2sdk-cs2
+        } else {
+          git clone -q --recursive --depth 1 --branch tf2 https://github.com/alliedmodders/hl2sdk.git sdks/hl2sdk-tf2
+        }
+        git -C metamod-source log --oneline -1
+        git -C sdks/hl2sdk-${{ matrix.sdk }} log --oneline -1
+        Get-ChildItem sdks/hl2sdk-${{ matrix.sdk }}/mathlib/AMBuilder, sdks/hl2sdk-${{ matrix.sdk }}/tier1/AMBuilder -ErrorAction SilentlyContinue | ForEach-Object { "SDK builds from source: $($_.FullName)" }
+    - name: Generate the solution
+      run: |
+        mkdir build
+        cd build
+        python ../metamod-source/configure.py --sdks=${{ matrix.sdk }} --targets=x86_64 --hl2sdk-root=../sdks --gen=vs --vs-version=2022
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        Get-ChildItem -Recurse -Include *.sln, *.vcxproj | ForEach-Object { $_.FullName }
+    - name: Build every solution configuration
+      run: |
+        cd build
+        $sln = (Get-ChildItem *.sln)[0].Name
+        $configs = Select-String -Path $sln -Pattern '^\s+(.+)\|(.+) = \1\|\2' | ForEach-Object { ,@($_.Matches[0].Groups[1].Value, $_.Matches[0].Groups[2].Value) }
+        $failed = 0
+        foreach ($c in $configs) {
+          Write-Host "::group::$($c[0])|$($c[1])"
+          msbuild $sln "-p:Configuration=$($c[0])" "-p:Platform=$($c[1])" -m -v:minimal
+          $rc = $LASTEXITCODE
+          Write-Host "::endgroup::"
+          Write-Host "$($c[0])|$($c[1]): exit $rc"
+          if ($rc -ne 0) { $failed++ }
+        }
+        Get-ChildItem -Recurse -Include *.dll, *.lib | ForEach-Object { $_.FullName }
+        if ($failed -ne 0) { exit 1 }
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: solution-${{ matrix.sdk }}
+        path: |
+          build/**/*.sln
+          build/**/*.vcxproj
