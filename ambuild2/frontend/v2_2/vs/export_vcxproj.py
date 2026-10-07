@@ -262,6 +262,10 @@ def export_configuration_options(node, xml, builder):
             xml.tag('RuntimeLibrary', 'MultiThreadedDLL')
         elif '/MDd' in flags:
             xml.tag('RuntimeLibrary', 'MultiThreadedDebugDLL')
+        else:
+            # cl.exe's default without one of the flags; MSBuild's would be
+            # MultiThreadedDLL, so the project wouldn't build what ambuild does.
+            xml.tag('RuntimeLibrary', 'MultiThreaded')
 
         if '/W0' in flags:
             xml.tag('WarningLevel', 'Level0')
