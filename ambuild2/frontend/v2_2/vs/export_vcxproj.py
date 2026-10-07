@@ -328,8 +328,8 @@ def export_configuration_options(node, xml, builder):
                 if m is not None:
                     machine = m.group(1)
             else:
-                local_path = os.path.join(node.context.buildFolder, builder.localFolder)
-                local_path = os.path.relpath(flag.path, local_path)
+                # MSBuild resolves it from the project's folder, not the binary's.
+                local_path = os.path.relpath(flag.path, node.context.buildFolder or '.')
                 libs.append(local_path)
 
         if '/WX' in link_flags:

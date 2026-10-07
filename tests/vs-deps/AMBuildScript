@@ -1,20 +1,12 @@
 # vim: set ts=8 sts=2 tw=99 et ft=python:
 #
-# A program linking a static library that is built as a project with its own
-# configuration, the way hl2sdk-manifests builds an SDK's mathlib: through
-# postlink by path and linkdeps by node. With --gen=vs, building the solution
-# has to build the library first and link the program against it.
-import os
-
+# A program in its own folder linking static libraries that are built as
+# projects with their own configurations: helper the way hl2sdk-manifests
+# links an SDK's mathlib (postlink by path, linkdeps by node), other the way
+# Metamod:Source links KHook (the node in linkflags). With --gen=vs, building
+# the solution has to build both libraries first and link the program against
+# them.
 cxx = builder.DetectCxx()
 
-project = builder.StaticLibraryProject('helper')
-project.sources = ['helper.cpp']
-project.Configure(cxx, 'helper', 'Helper - {0}'.format(cxx.target.arch))
-helper = builder.Add(project)[0]
-
-program = cxx.Program('main')
-program.sources = ['main.cpp']
-program.compiler.postlink += [os.path.join(builder.buildPath, helper.binary.path)]
-program.compiler.linkdeps += [helper.binary]
-builder.Add(program)
+Libs = builder.Build('libs/AMBuilder', {'cxx': cxx})
+builder.Build('program/AMBuilder', {'cxx': cxx, 'Libs': Libs})

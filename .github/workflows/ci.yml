@@ -64,5 +64,5 @@ jobs:
         python ../tests/vs-deps/configure.py --gen=vs --vs-version=2022
         msbuild vs-deps.sln -p:Configuration=Default -p:Platform=Win32 -m
         if ($LASTEXITCODE -ne 0) { exit 1 }
-        & ".\main - Default\main.exe"
+        & ".\program\main - Default\main.exe"
         if ($LASTEXITCODE -ne 0) { exit 1 }
