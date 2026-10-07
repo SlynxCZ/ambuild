@@ -15,7 +15,7 @@ builder.Build('program/AMBuilder', {'cxx': cxx, 'Libs': Libs})
 # Metamod:Source its one-off binaries, so the same projects are made again in
 # the same folder: with --gen=vs, one project file with the configurations of
 # both.
-if builder.host.platform == 'windows':
+if builder.host.platform == 'windows' and cxx.target.arch != 'x86_64':
   cxx64 = builder.DetectCxx(target_arch = 'x86_64')
   Libs64 = builder.Build('libs/AMBuilder', {'cxx': cxx64})
   builder.Build('program/AMBuilder', {'cxx': cxx64, 'Libs': Libs64})
