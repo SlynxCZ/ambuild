@@ -109,6 +109,13 @@ class Project(object):
                    existing.compiler.target.arch == builder.compiler.target.arch:
                     raise Exception('Project {0} already has configuration {1} ({2})'.format(
                         node.path, builder.tag_, builder.compiler.target.arch))
+            # One-off binaries of the same name and tag share a folder, so the one
+            # merged in gets its architecture in the folder name.
+            if any(existing.localFolder == builder.localFolder for existing in self.builders_):
+                builder.localFolderSuffix_ = builder.compiler.target.arch
+                if any(existing.localFolder == builder.localFolder for existing in self.builders_):
+                    raise Exception('Project {0} already has folder {1}'.format(
+                        node.path, builder.localFolder))
         self.builders_ += other.builders_
         for header in other.include_hotlist:
             if header not in self.include_hotlist:
@@ -179,16 +186,20 @@ class BinaryBuilder(object):
         self.include_hotlist = []
         self.name_ = name
         self.tag_ = tag
+        self.localFolderSuffix_ = None
 
     @property
     def localFolder(self):
         # If this is a one-off binary, we need to make sure its folder name won't
         # create conflicts.
         if hasattr(self, 'generate'):
-            return '{0} - {1}'.format(self.name_, self.tag_)
-
-        # Otherwise - we basically expect one project per context.
-        return self.tag_
+            folder = '{0} - {1}'.format(self.name_, self.tag_)
+        else:
+            # Otherwise - we basically expect one project per context.
+            folder = self.tag_
+        if self.localFolderSuffix_:
+            folder = '{0} - {1}'.format(folder, self.localFolderSuffix_)
+        return folder
 
     @property
     def outputFile(self):

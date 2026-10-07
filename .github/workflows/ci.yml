@@ -66,5 +66,7 @@ jobs:
         if ($LASTEXITCODE -ne 0) { exit 1 }
         & ".\program\main - Default\main.exe"
         if ($LASTEXITCODE -ne 0) { exit 1 }
-        msbuild vs-deps.sln "-p:Configuration=Helper - x86_64" -p:Platform=x64 -m
+        msbuild vs-deps.sln -p:Configuration=Default -p:Platform=x64 -m
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+        & ".\program\main - Default - x86_64\main.exe"
         if ($LASTEXITCODE -ne 0) { exit 1 }
